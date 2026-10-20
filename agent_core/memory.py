@@ -25,7 +25,7 @@ class ContextWindowManager:
         return sum(m.estimated_tokens for m in self._messages)
 
     def _enforce_budget(self) -> None:
-        while self.current_token_usage > self.max_token_budget and len(self._messages) > 4:
+        while self.current_token_usage > self.max_token_budget and len(self._messages) > 3:
             evicted = self._messages.pop(2)
             if evicted.role == Role.ASSISTANT and evicted.tool_calls and len(self._messages) > 2:
                 if self._messages[2].role == Role.TOOL:

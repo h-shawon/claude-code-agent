@@ -21,11 +21,14 @@ class AnthropicProvider(LLMProvider):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-3-5-sonnet-latest",
+        model: str | None = None,
+        endpoint: str = "https://api.anthropic.com/v1/messages",
     ) -> None:
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-        self.model = model
-        self.endpoint = "[https://api.anthropic.com/v1/messages](https://api.anthropic.com/v1/messages)"
+        self.api_key = (api_key or os.getenv("ANTHROPIC_API_KEY", "")).strip()
+        self.model = (model or os.getenv("DEFAULT_MODEL", "claude-3-5-sonnet-latest")).strip()
+        self.endpoint = endpoint.strip()
+        if not self.endpoint.startswith(("http://", "https://")):
+            self.endpoint = "https://" + self.endpoint.lstrip("/")
 
     async def generate(
         self, messages: List[Message], tools: List[Dict[str, Any]]
@@ -75,7 +78,7 @@ class AnthropicProvider(LLMProvider):
         if tools:
             body["tools"] = tools
 
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=45.0, trust_env=False) as client:
             resp = await client.post(self.endpoint, headers=headers, json=body)
             resp.raise_for_status()
             data = resp.json()
@@ -108,11 +111,14 @@ class DeepSeekProvider(LLMProvider):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "deepseek-chat",
+        model: str | None = None,
+        endpoint: str = "https://api.deepseek.com/chat/completions",
     ) -> None:
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY", "")
-        self.model = model
-        self.endpoint = "[https://api.deepseek.com/chat/completions](https://api.deepseek.com/chat/completions)"
+        self.api_key = (api_key or os.getenv("DEEPSEEK_API_KEY", "")).strip()
+        self.model = (model or os.getenv("DEFAULT_MODEL", "deepseek-chat")).strip()
+        self.endpoint = endpoint.strip()
+        if not self.endpoint.startswith(("http://", "https://")):
+            self.endpoint = "https://" + self.endpoint.lstrip("/")
 
     async def generate(
         self, messages: List[Message], tools: List[Dict[str, Any]]
@@ -167,9 +173,12 @@ class DeepSeekProvider(LLMProvider):
         if openai_tools:
             body["tools"] = openai_tools
 
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=45.0, trust_env=False) as client:
             resp = await client.post(self.endpoint, headers=headers, json=body)
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                raise RuntimeError(
+                    f"DeepSeek API HTTP {resp.status_code}: {resp.text}"
+                )
             choice = resp.json()["choices"][0]["message"]
 
         tool_calls = None
@@ -191,9 +200,7 @@ class DeepSeekProvider(LLMProvider):
 
 
 class MockDeterministicProvider(LLMProvider):
-    """
-    Deterministic scripted LLM provider for offline execution and unit testing.
-    """
+    """Deterministic scripted LLM provider for offline execution and unit testing."""
 
     def __init__(self, scripted_responses: List[Message]) -> None:
         self._responses = list(scripted_responses)

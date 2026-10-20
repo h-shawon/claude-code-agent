@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from pathlib import Path
 from agent_core import (
@@ -40,8 +41,10 @@ def test_sliding_window_token_pruning() -> None:
     assert memory.current_token_usage <= 60
 
 
-@pytest.mark.asyncio
-async def test_self_correcting_tool_loop(tmp_path: Path) -> None:
+def test_self_correcting_tool_loop(tmp_path: Path) -> None:
+    asyncio.run(_run_self_correcting_loop(tmp_path))
+
+async def _run_self_correcting_loop(tmp_path: Path) -> None:
     reg = ToolRegistry()
 
     @tool(reg)
